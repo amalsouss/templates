@@ -9,7 +9,7 @@ app = Flask(__name__)
 
 BASE_URL = "https://academy-app-lco1.onrender.com"
 
-# DB
+# 🟢 إنشاء قاعدة البيانات
 def init_db():
     conn = sqlite3.connect("database.db")
     c = conn.cursor()
@@ -26,7 +26,7 @@ def init_db():
 
 init_db()
 
-# PDF
+# 🟢 PDF
 def create_pdf(name, amount):
     file = "receipt.pdf"
     doc = SimpleDocTemplate(file, pagesize=A5)
@@ -37,12 +37,15 @@ def create_pdf(name, amount):
         ["المبلغ", f"{amount} درهم"]
     ]
 
-    content = [Paragraph("وصل الأداء", style), Table(data)]
-    doc.build(content)
+    content = [
+        Paragraph("وصل الأداء", style),
+        Table(data)
+    ]
 
+    doc.build(content)
     return file
 
-# HOME
+# 🟢 الصفحة الرئيسية
 @app.route("/", methods=["GET","POST"])
 def index():
     if request.method == "POST":
@@ -63,7 +66,7 @@ def index():
 
     return render_template("index.html")
 
-# DASHBOARD
+# 🟢 Dashboard
 @app.route("/dashboard")
 def dashboard():
     conn = sqlite3.connect("database.db")
@@ -82,7 +85,7 @@ def dashboard():
 
     return render_template("dashboard.html", total=total, players=players, rows=rows)
 
-# PDF
+# 🟢 PDF route
 @app.route("/pdf/<int:id>")
 def pdf(id):
     conn = sqlite3.connect("database.db")
@@ -94,7 +97,7 @@ def pdf(id):
     file = create_pdf(r[1], r[2])
     return send_file(file, as_attachment=True)
 
-# WhatsApp
+# 🟢 WhatsApp
 @app.route("/whatsapp/<int:id>")
 def whatsapp(id):
     conn = sqlite3.connect("database.db")
@@ -110,10 +113,11 @@ def whatsapp(id):
 
     return redirect(url)
 
-# SEARCH
+# 🟢 البحث
 @app.route("/search", methods=["GET","POST"])
 def search():
     results = []
+
     if request.method == "POST":
         name = request.form["name"]
 
@@ -125,5 +129,7 @@ def search():
 
     return render_template("search.html", results=results)
 
+# 🔥 مهم بزاف ل Render
 if __name__ == "__main__":
-    app.run()
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port)
