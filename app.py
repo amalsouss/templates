@@ -1,15 +1,23 @@
 from flask import Flask, render_template, request, redirect, send_file
 import sqlite3, datetime, os, urllib.parse
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Table
+from reportlab.platypus import *
+from reportlab.lib import colors
 from reportlab.lib.pagesizes import A5
 from reportlab.lib.styles import ParagraphStyle
+from reportlab.lib.utils import ImageReader
 import qrcode
 
 app = Flask(__name__)
 
-BASE_URL = "https://academy-app-lco1.onrender.com"
+BASE_URL = "https://templates-4iru.onrender.com"
 
-# 🟢 إنشاء قاعدة البيانات
+# 📁 paths
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+LOGO = os.path.join(BASE_DIR, "logo_circle.png")
+SIGN = os.path.join(BASE_DIR, "signature.png")
+STAMP = os.path.join(BASE_DIR, "stamp.png")
+
+# 🟢 DB
 def init_db():
     conn = sqlite3.connect("database.db")
     c = conn.cursor()
@@ -26,26 +34,69 @@ def init_db():
 
 init_db()
 
-# 🟢 PDF
-def create_pdf(name, amount):
-    file = "receipt.pdf"
-    doc = SimpleDocTemplate(file, pagesize=A5)
-    style = ParagraphStyle(name="normal", fontSize=12)
+# 🧾 PDF
+def create_pdf(id, name, amount):
 
+    file = f"receipt_{id}.pdf"
+
+    doc = SimpleDocTemplate(file, pagesize=A5)
+
+    title = ParagraphStyle(name="title", fontSize=14, alignment=1)
+    normal = ParagraphStyle(name="normal", fontSize=10)
+
+    content = []
+
+    # 🟢 LOGO
+    if os.path.exists(LOGO):
+        content.append(Image(ImageReader(LOGO), 60, 60))
+
+    content.append(Paragraph("وصل الأداء", title))
+    content.append(Spacer(1,10))
+
+    # 🟢 TABLE
     data = [
         ["الاسم", name],
         ["المبلغ", f"{amount} درهم"]
     ]
 
-    content = [
-        Paragraph("وصل الأداء", style),
-        Table(data)
-    ]
+    table = Table(data)
+    table.setStyle([
+        ('GRID', (0,0), (-1,-1), 1, colors.black),
+        ('BACKGROUND', (0,0), (-1,0), colors.lightblue)
+    ])
+
+    content.append(table)
+    content.append(Spacer(1,15))
+
+    # 🟢 QR
+    link = f"{BASE_URL}/pdf/{id}"
+    qr_file = f"qr_{id}.png"
+    qr = qrcode.make(link)
+    qr.save(qr_file)
+
+    content.append(Image(qr_file, 80, 80))
+    content.append(Spacer(1,10))
+
+    # 🟢 SIGN + STAMP
+    row = []
+
+    if os.path.exists(SIGN):
+        row.append(Image(ImageReader(SIGN), 100, 40))
+    else:
+        row.append("")
+
+    if os.path.exists(STAMP):
+        row.append(Image(ImageReader(STAMP), 80, 80))
+    else:
+        row.append("")
+
+    content.append(Table([row]))
 
     doc.build(content)
+
     return file
 
-# 🟢 الصفحة الرئيسية
+# 🟢 HOME
 @app.route("/", methods=["GET","POST"])
 def index():
     if request.method == "POST":
@@ -66,7 +117,7 @@ def index():
 
     return render_template("index.html")
 
-# 🟢 Dashboard
+# 🟢 DASHBOARD
 @app.route("/dashboard")
 def dashboard():
     conn = sqlite3.connect("database.db")
@@ -85,7 +136,7 @@ def dashboard():
 
     return render_template("dashboard.html", total=total, players=players, rows=rows)
 
-# 🟢 PDF route
+# 🟢 PDF
 @app.route("/pdf/<int:id>")
 def pdf(id):
     conn = sqlite3.connect("database.db")
@@ -94,26 +145,18 @@ def pdf(id):
     r = c.fetchone()
     conn.close()
 
-    file = create_pdf(r[1], r[2])
+    file = create_pdf(id, r[1], r[2])
     return send_file(file, as_attachment=True)
 
-# 🟢 WhatsApp
+# 🟢 WHATSAPP
 @app.route("/whatsapp/<int:id>")
 def whatsapp(id):
-    conn = sqlite3.connect("database.db")
-    c = conn.cursor()
-    c.execute("SELECT * FROM payments WHERE id=?", (id,))
-    r = c.fetchone()
-    conn.close()
-
     link = f"{BASE_URL}/pdf/{id}"
-
-    msg = f"وصل الأداء:\n{r[1]}\n{r[2]} درهم\n{link}"
+    msg = f"وصل الأداء:\n{link}"
     url = "https://wa.me/?text=" + urllib.parse.quote(msg)
-
     return redirect(url)
 
-# 🟢 البحث
+# 🟢 SEARCH
 @app.route("/search", methods=["GET","POST"])
 def search():
     results = []
@@ -129,7 +172,7 @@ def search():
 
     return render_template("search.html", results=results)
 
-# 🔥 مهم بزاف ل Render
+# 🔥 Render PORT FIX
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
