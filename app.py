@@ -4,20 +4,19 @@ from reportlab.platypus import *
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import A5
 from reportlab.lib.styles import ParagraphStyle
-from reportlab.lib.utils import ImageReader
 import qrcode
 
 app = Flask(__name__)
 
 BASE_URL = "https://templates-4iru.onrender.com"
 
-# 📁 paths
+# 📁 PATHS
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 LOGO = os.path.join(BASE_DIR, "logo_circle.png")
 SIGN = os.path.join(BASE_DIR, "signature.png")
 STAMP = os.path.join(BASE_DIR, "stamp.png")
 
-# 🟢 DB
+# 🟢 DATABASE
 def init_db():
     conn = sqlite3.connect("database.db")
     c = conn.cursor()
@@ -34,24 +33,25 @@ def init_db():
 
 init_db()
 
-# 🧾 PDF
+# 🧾 PDF (SAFE VERSION)
 def create_pdf(id, name, amount):
 
     file = f"receipt_{id}.pdf"
-
     doc = SimpleDocTemplate(file, pagesize=A5)
 
     title = ParagraphStyle(name="title", fontSize=14, alignment=1)
-    normal = ParagraphStyle(name="normal", fontSize=10)
 
     content = []
 
-    # 🟢 LOGO
-    if os.path.exists(LOGO):
-        content.append(Image(ImageReader(LOGO), 60, 60))
+    # 🟢 LOGO (safe)
+    try:
+        if os.path.exists(LOGO):
+            content.append(Image(LOGO, 60, 60))
+    except:
+        pass
 
     content.append(Paragraph("وصل الأداء", title))
-    content.append(Spacer(1,10))
+    content.append(Spacer(1, 10))
 
     # 🟢 TABLE
     data = [
@@ -66,28 +66,36 @@ def create_pdf(id, name, amount):
     ])
 
     content.append(table)
-    content.append(Spacer(1,15))
+    content.append(Spacer(1, 15))
 
     # 🟢 QR
-    link = f"{BASE_URL}/pdf/{id}"
-    qr_file = f"qr_{id}.png"
-    qr = qrcode.make(link)
-    qr.save(qr_file)
+    try:
+        link = f"{BASE_URL}/pdf/{id}"
+        qr_file = f"qr_{id}.png"
+        qrcode.make(link).save(qr_file)
+        content.append(Image(qr_file, 80, 80))
+    except:
+        pass
 
-    content.append(Image(qr_file, 80, 80))
-    content.append(Spacer(1,10))
+    content.append(Spacer(1, 10))
 
     # 🟢 SIGN + STAMP
     row = []
 
-    if os.path.exists(SIGN):
-        row.append(Image(ImageReader(SIGN), 100, 40))
-    else:
+    try:
+        if os.path.exists(SIGN):
+            row.append(Image(SIGN, 100, 40))
+        else:
+            row.append("")
+    except:
         row.append("")
 
-    if os.path.exists(STAMP):
-        row.append(Image(ImageReader(STAMP), 80, 80))
-    else:
+    try:
+        if os.path.exists(STAMP):
+            row.append(Image(STAMP, 80, 80))
+        else:
+            row.append("")
+    except:
         row.append("")
 
     content.append(Table([row]))
@@ -97,7 +105,7 @@ def create_pdf(id, name, amount):
     return file
 
 # 🟢 HOME
-@app.route("/", methods=["GET","POST"])
+@app.route("/", methods=["GET", "POST"])
 def index():
     if request.method == "POST":
         name = request.form["name"]
@@ -139,14 +147,21 @@ def dashboard():
 # 🟢 PDF
 @app.route("/pdf/<int:id>")
 def pdf(id):
-    conn = sqlite3.connect("database.db")
-    c = conn.cursor()
-    c.execute("SELECT * FROM payments WHERE id=?", (id,))
-    r = c.fetchone()
-    conn.close()
+    try:
+        conn = sqlite3.connect("database.db")
+        c = conn.cursor()
+        c.execute("SELECT * FROM payments WHERE id=?", (id,))
+        r = c.fetchone()
+        conn.close()
 
-    file = create_pdf(id, r[1], r[2])
-    return send_file(file, as_attachment=True)
+        if not r:
+            return "Not found"
+
+        file = create_pdf(id, r[1], r[2])
+        return send_file(file, as_attachment=True)
+
+    except Exception as e:
+        return f"Error: {str(e)}"
 
 # 🟢 WHATSAPP
 @app.route("/whatsapp/<int:id>")
@@ -157,7 +172,7 @@ def whatsapp(id):
     return redirect(url)
 
 # 🟢 SEARCH
-@app.route("/search", methods=["GET","POST"])
+@app.route("/search", methods=["GET", "POST"])
 def search():
     results = []
 
@@ -172,7 +187,7 @@ def search():
 
     return render_template("search.html", results=results)
 
-# 🔥 Render PORT FIX
+# 🔥 مهم ل Render
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
