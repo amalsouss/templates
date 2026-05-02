@@ -2,5 +2,3 @@ flask
 reportlab
 qrcode
 pillow
-arabic-reshaper
-python-bidi
